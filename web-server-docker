@@ -1,0 +1,8 @@
+FROM python:3.12.6-bullseye
+WORKDIR /web-server
+COPY web-server/requirements.txt .
+RUN pip install -r requirements.txt
+COPY web-server/ .
+CMD python grpc_server.py & \
+    python apps/main/services/rabbitmq/receive.py & \
+    python manage.py runserver 0.0.0.0:8000

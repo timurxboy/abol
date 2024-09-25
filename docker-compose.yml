@@ -1,0 +1,84 @@
+version: '3.8'
+services:
+
+  rabbitmq:
+    image: rabbitmq:management
+    container_name: "rabbit-mq"
+    healthcheck:
+      test: [ "CMD", "rabbitmq-diagnostics", "check_running" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7.2
+    container_name: "redis"
+
+  postgres-db:
+    image: postgres:15-alpine
+    restart: always
+    container_name: "postgres-db"
+    environment:
+      TZ: "Europe/Moscow"
+      PGTZ: "Europe/Moscow"
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    command: postgres -c 'max_connections=1000'
+    volumes:
+      - postgres-volume:/var/lib/postgresql/data
+    depends_on:
+      rabbitmq:
+        condition: "service_healthy"
+    env_file:
+      - .env
+
+  web-server:
+    build:
+      context: .
+      dockerfile: web-server-docker
+    container_name: "web-server-1"
+    environment:
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+      DB_HOST: postgres-db
+      DB_PORT: ${DB_PORT}
+      GRPC_SERVER_PORT: ${GRPC_SERVER_PORT}
+      RABBITMQ_HOST: rabbitmq
+    depends_on:
+      postgres-db:
+        condition: "service_started"
+      redis:
+        condition: "service_started"
+    env_file:
+      - .env
+
+  gateway:
+    build:
+      context: .
+      dockerfile: gateway-docker
+    container_name: "gateway"
+    environment:
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+      DB_HOST: postgres-db
+      DB_PORT: ${DB_PORT}
+      GRPC_SERVER_HOST: web-server
+      GRPC_SERVER_PORT: ${GRPC_SERVER_PORT}
+      REDIS_HOST: redis
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres-db:
+        condition: "service_started"
+      redis:
+        condition: "service_started"
+      web-server:
+        condition: "service_started"
+    env_file:
+      - .env
+
+volumes:
+  postgres-volume:

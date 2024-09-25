@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+package book;
+
+service Book {
+    rpc GetBook (BookIdRequest) returns (BookResponseID) {}
+    rpc ListBook (Empty) returns (ListBookResponse) {}
+    rpc CreateBook (BookResponse) returns (BookResponseID) {}
+    rpc UpdateBook (BookResponseID) returns (BookResponseID) {}
+    rpc DeleteBook (BookIdRequest) returns (Empty) {}
+}
+
+
+message BookIdRequest {
+    int32 id = 1;
+}
+
+message Empty {}
+
+message BookResponse {
+    string name = 1;
+    string author = 2;
+    string publication_date = 3;
+}
+
+message BookResponseID {
+    int32 id = 1;
+    string name = 2;
+    string author = 3;
+    string publication_date = 4;
+}
+
+message ListBookResponse {
+    repeated BookResponseID data = 1;
+}
+
