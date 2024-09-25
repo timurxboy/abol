@@ -10,9 +10,26 @@ from apps.main.serializers import CreateBookSerializer
 
 CACHE_TTL = getattr(settings, 'CACHE_TTL', 60 * 15)
 
-class GetBookDetailView(APIView):
+class BookView(APIView):
     serializer_class = CreateBookSerializer
 
+    def prepare_book_data(self, book):
+        return {
+            "id": book.id,
+            "name": book.name,
+            "author": book.author,
+            "publication_date": book.publication_date
+        }
+
+    def handle_grpc_error(self, error):
+        if error.code() == grpc.StatusCode.NOT_FOUND:
+            return Response(error.details(), status=status.HTTP_404_NOT_FOUND)
+        return Response("Internal Server Error", status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class GetBookDetailView(BookView):
+    
+    @extend_schema(responses={status.HTTP_200_OK: CreateBookSerializer})
     def get(self, request, pk):
         cached_book = cache.get(f'book_{pk}')
         if cached_book:
@@ -38,6 +55,7 @@ class GetBookDetailView(APIView):
                 publication_date=str(filter_serializer.validated_data['publication_date'])
             )
             data = self.prepare_book_data(response)
+            cache.delete('books')
             cache.set(f'book_{pk}', data, timeout=CACHE_TTL)
             return Response(data, status=status.HTTP_200_OK)
         except grpc.RpcError as e:
@@ -47,27 +65,15 @@ class GetBookDetailView(APIView):
         try:
             grpc_client.delete_book(id=pk)
             cache.delete(f'book_{pk}')
+            cache.delete('books')
             return Response(status=status.HTTP_204_NO_CONTENT)
         except grpc.RpcError as e:
             return self.handle_grpc_error(e)
 
-    def prepare_book_data(self, response):
-        return {
-            "id": response.id,
-            "name": response.name,
-            "author": response.author,
-            "publication_date": response.publication_date
-        }
 
-    def handle_grpc_error(self, error):
-        if error.code() == grpc.StatusCode.NOT_FOUND:
-            return Response(error.details(), status=status.HTTP_404_NOT_FOUND)
-        return Response("Internal Server Error", status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
-class GetBookView(APIView):
-    serializer_class = CreateBookSerializer
-
+class GetBookView(BookView):
+    
+    @extend_schema(responses={status.HTTP_200_OK: CreateBookSerializer(many=True)})
     def get(self, request):
         cached_books = cache.get('books')
         if cached_books:
@@ -90,6 +96,7 @@ class GetBookView(APIView):
                 publication_date=str(filter_serializer.validated_data['publication_date'])
             )
             data = self.prepare_book_data(response)
+            cache.delete('books')
             cache.set(f'book_{response.id}', data, timeout=CACHE_TTL)
 
             cached_books = cache.get('books')
@@ -100,16 +107,3 @@ class GetBookView(APIView):
             return Response(data, status=status.HTTP_201_CREATED)
         except grpc.RpcError as e:
             return self.handle_grpc_error(e)
-
-    def prepare_book_data(self, book):
-        return {
-            "id": book.id,
-            "name": book.name,
-            "author": book.author,
-            "publication_date": book.publication_date
-        }
-
-    def handle_grpc_error(self, error):
-        if error.code() == grpc.StatusCode.NOT_FOUND:
-            return Response(error.details(), status=status.HTTP_404_NOT_FOUND)
-        return Response("Internal Server Error", status=status.HTTP_500_INTERNAL_SERVER_ERROR)

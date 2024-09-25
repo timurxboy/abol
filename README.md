@@ -152,3 +152,11 @@ message ListBookResponse {
 docker-compose exec gateway pytest apps/main/tests.py 
 ```
 
+
+## Дополнение
+
+Для добавления тестовых данных запустить команду:
+
+```
+docker-compose exec web-server python handler_scripts.py
+```

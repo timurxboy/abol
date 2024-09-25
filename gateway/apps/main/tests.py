@@ -6,6 +6,7 @@ from django.contrib.auth.models import User
 from django.urls import reverse
 from unittest.mock import patch
 import grpc
+from django.core.cache import cache
 
 
 class CustomRpcError(grpc.RpcError):
@@ -18,7 +19,6 @@ class CustomRpcError(grpc.RpcError):
 
     def details(self):
         return self._details
-
 
 @pytest.fixture
 def api_client():
@@ -48,7 +48,7 @@ def test_get_list_book_success(mock_list_book, api_client, jwt_token):
             })()
         ]
     })
-
+    cache.delete(f'books')
     response = api_client.get(
         reverse('Book', args=[]),
         HTTP_AUTHORIZATION=f'Bearer {jwt_token}'
@@ -72,7 +72,7 @@ def test_get_book_success(mock_get_book, api_client, jwt_token):
         'author': 'Author Name',
         'publication_date': '2023-01-01'
     })()
-
+    cache.delete(f'book_1')
     response = api_client.get(
         reverse('Book-Detail', args=[1]),
         HTTP_AUTHORIZATION=f'Bearer {jwt_token}'
@@ -91,7 +91,7 @@ def test_get_book_success(mock_get_book, api_client, jwt_token):
 @patch('grpc_client.get_book')
 def test_get_book_not_found(mock_get_book, api_client, jwt_token):
     mock_get_book.side_effect = CustomRpcError("Book with ID 999 not found.", grpc.StatusCode.NOT_FOUND)
-
+    cache.delete(f'book_999')
     response = api_client.get(
         reverse('Book-Detail', args=[999]),
         HTTP_AUTHORIZATION=f'Bearer {jwt_token}'
@@ -105,7 +105,7 @@ def test_get_book_not_found(mock_get_book, api_client, jwt_token):
 @patch('grpc_client.get_book')
 def test_get_book_internal_server_error(mock_get_book, api_client, jwt_token):
     mock_get_book.side_effect = CustomRpcError("Internal error.", grpc.StatusCode.INTERNAL)
-
+    cache.delete(f'book_1')
     response = api_client.get(
         reverse('Book-Detail', args=[1]),
         HTTP_AUTHORIZATION=f'Bearer {jwt_token}'
@@ -123,7 +123,7 @@ def test_post_book_success(mock_create_book, api_client, jwt_token):
         'author': 'Author Name',
         'publication_date': '2023-01-01'
     })()
-
+    cache.delete(f'books')
     response = api_client.post(
         reverse('Book', args=[]),
         data={
@@ -153,7 +153,7 @@ def test_put_book_success(mock_update_book, api_client, jwt_token):
         'author': 'Author Name',
         'publication_date': '2023-01-01'
     })()
-
+    cache.delete(f'book_1')
     response = api_client.put(
         reverse('Book-Detail', args=[1]),
         data={
@@ -178,7 +178,7 @@ def test_put_book_success(mock_update_book, api_client, jwt_token):
 @patch('grpc_client.update_book')
 def test_put_book_not_found(mock_update_book, api_client, jwt_token):
     mock_update_book.side_effect = CustomRpcError("Book with ID 999 not found.", grpc.StatusCode.NOT_FOUND)
-
+    cache.delete(f'book_999')
     response = api_client.put(
         reverse('Book-Detail', args=[999]),
         data={
@@ -197,7 +197,7 @@ def test_put_book_not_found(mock_update_book, api_client, jwt_token):
 @patch('grpc_client.update_book')
 def test_put_book_server_error(mock_update_book, api_client, jwt_token):
     mock_update_book.side_effect = CustomRpcError("Internal error.", grpc.StatusCode.INTERNAL)
-
+    cache.delete(f'book_1')
     response = api_client.put(
         reverse('Book-Detail', args=[1]),
         data={
@@ -215,8 +215,8 @@ def test_put_book_server_error(mock_update_book, api_client, jwt_token):
 @pytest.mark.django_db
 @patch('grpc_client.delete_book')
 def test_delete_book_success(mock_delete_book, api_client, jwt_token):
-    mock_delete_book.return_value = None  # Успешное удаление ничего не возвращает
-
+    mock_delete_book.return_value = None  
+    cache.delete(f'book_1')
     response = api_client.delete(
         reverse('Book-Detail', args=[1]),
         HTTP_AUTHORIZATION=f'Bearer {jwt_token}'
@@ -229,7 +229,7 @@ def test_delete_book_success(mock_delete_book, api_client, jwt_token):
 @patch('grpc_client.delete_book')
 def test_delete_book_not_found(mock_delete_book, api_client, jwt_token):
     mock_delete_book.side_effect = CustomRpcError("Book with ID 999 not found.", grpc.StatusCode.NOT_FOUND)
-
+    cache.delete(f'book_999')
     response = api_client.delete(
         reverse('Book-Detail', args=[999]),
         HTTP_AUTHORIZATION=f'Bearer {jwt_token}'
