@@ -46,3 +46,10 @@
 - **Контейнеризация**: Docker, Docker Compose
 - **Кэширование**: Redis (если требуется)
 - **Тестирование**: pytest (или unittest)
+
+
+```
+npm install
+npm run serve
+```
+
